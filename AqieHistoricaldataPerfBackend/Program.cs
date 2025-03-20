@@ -8,6 +8,12 @@ using System.Diagnostics.CodeAnalysis;
 using AqieHistoricaldataPerfBackend.Config;
 using AqieHistoricaldataPerfBackend.Utils.Logging;
 using Serilog;
+using AqieHistoricaldataPerfBackend.Atomfeed.Endpoints;
+using AqieHistoricaldataPerfBackend.Atomfeed.Services;
+using Microsoft.Net.Http.Headers;
+using Amazon.S3;
+using Hangfire;
+using Hangfire.MemoryStorage;
 
 var app = CreateWebApplication(args);
 await app.RunAsync();
@@ -36,15 +42,23 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     builder.Host.UseSerilog(CdpLogging.Configuration);
     
     // Default HTTP Client
-    builder.Services
-        .AddHttpClient("DefaultClient")
-        .AddHeaderPropagation();
+    //builder.Services
+    //    .AddHttpClient("DefaultClient")
+    //    .AddHeaderPropagation();
 
     // Proxy HTTP Client
     builder.Services.AddTransient<ProxyHttpMessageHandler>();
     builder.Services
         .AddHttpClient("proxy")
         .ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>();
+
+    builder.Services.AddHttpClient("Atomfeed", httpClient =>
+    {
+        httpClient.BaseAddress = new Uri("https://uk-air.defra.gov.uk/");
+    
+    }).ConfigurePrimaryHttpMessageHandler<ProxyHttpMessageHandler>(); ;
+    
+    
 
     // Propagate trace header.
     builder.Services.AddHeaderPropagation(options =>
@@ -55,8 +69,12 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
             options.Headers.Add(traceHeader);
         }
     });
+
+    // Add Hangfire services.
+    builder.Services.AddHangfire(config => config.UseMemoryStorage());
+    builder.Services.AddHangfireServer();
     
-    
+
     // Set up the MongoDB client. Config and credentials are injected automatically at runtime.
     builder.Services.Configure<MongoConfig>(builder.Configuration.GetSection("Mongo"));
     builder.Services.AddSingleton<IMongoDbClientFactory, MongoDbClientFactory>();
@@ -66,6 +84,7 @@ static void ConfigureBuilder(WebApplicationBuilder builder)
     
     // Set up the endpoints and their dependencies
     builder.Services.AddSingleton<IExamplePersistence, ExamplePersistence>();
+    builder.Services.AddSingleton<IAtomHistoryService, AtomHistoryService>();
 }
 
 [ExcludeFromCodeCoverage]
@@ -77,6 +96,7 @@ static WebApplication SetupApplication(WebApplication app)
 
     // Example module, remove before deploying!
     app.UseExampleEndpoints();
-
+    app.UseServiceAtomHistoryEndpoints();
+    app.UseHangfireDashboard("/hangfire");
     return app;
 }
