@@ -226,7 +226,8 @@ namespace AqieHistoricaldataPerfBackend.Atomfeed.Services
             {
                 var csvbyte = atomfeedexport_csv(Final_list, data);
                 string Region = Environment.GetEnvironmentVariable("AWS_REGION") ?? throw new ArgumentNullException("AWS_REGION");
-                string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
+                //string s3BucketName = "dev-aqie-historicaldata-backend-c63f2";
+                string s3BucketName = "dev-aqie-historicaldata-perf-backend-c63f2";                
                 string s3Key = "measurement_data_" + siteId + "_" + year + ".csv";
                 var regionEndpoint = Amazon.RegionEndpoint.GetBySystemName(Region);
                 logger.LogInformation("S3 bucket region {regionEndpoint}", regionEndpoint);
@@ -301,7 +302,7 @@ namespace AqieHistoricaldataPerfBackend.Atomfeed.Services
                                 Subpollutant = y.Select(x => new SubpollutantItem
                                 {
                                     pollutantname = x.Pollutantname,
-                                    pollutantvalue = x.Value,
+                                    pollutantvalue = x.Value == "-99" ? "no data" : x.Value,
                                     verification = x.Verification == "1" ? "V" :
                                                    x.Verification == "2" ? "P" :
                                                    x.Verification == "3" ? "N" : "no data"
